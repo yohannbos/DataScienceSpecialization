@@ -1,0 +1,166 @@
+---
+output: html_document
+---
+#Impact of weather events on public health and economy
+
+##SYNOPSIS
+Based on the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database we answered 2 questions:
+1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+2.Across the United States, which types of events have the greatest economic consequences?
+
+The results point out that 3 main types of events out of 50 are the most harmful for US population health and economy respectively:
+
+1. Concerning Population Heath in terms of Injuries: Tornados (by fare), Floods and Excessive heats.
+1. Concerning Population Heath in terms of Deaths: Excessive Heats, Tornados and Heat.
+2. Concerning Economic consequences: Floods (by fare), Hurricanes and Flash Floods.
+
+##DATA PROCESSING
+
+###downloading and extracting data
+
+The zip file is downloaded from the website and stored on the disk in a folder called "Storm".
+```{r, echo=FALSE, results="hide", cache=TRUE}
+url<-"http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+if (!file.exists("Storm")){dir.create("Storm")}
+download.file(url, destfile=file.path("Storm","data.bz2"))
+```
+
+Data set is stored into R in "data"
+
+```{r, echo=TRUE, cache=TRUE}
+dataa<-read.csv("Storm/data.bz2")
+head(dataa)
+```
+
+###Cleaning Data
+While doing exploratory analysis, one can observe that the raw data is some kind of messy. 
+
+1. As the NOAA shows in his document there should be only 50 events types. The data shows almost a thousand of unique types:
+
+```{r, echo=TRUE}
+length(unique(dataa$EVTYPE))
+```
+
+2. the data for years before 1995 seems not relevant enough, Hence, we subset the data like follows:
+
+```{r, echo=TRUE}
+datab<-dataa
+datab$BGN_DATE<-as.Date(as.character(datab$BGN_DATE), format="%m/%d/%Y")
+data<-subset(datab,datab$BGN_DATE>as.Date("1995-01-01"))
+data$BGN_DATE<-as.Date(as.character(data$BGN_DATE), format="%Y%m/%d/ %H:%M:%S")
+```
+
+Using some basic patterns we can clean the data to higher the probability of a viable outcome.
+
+```{r, echo=TRUE, cache=TRUE}
+data1<-subset(data, data$FATALITIES!=0 | data$INJURIES!=0 | data$PROPDMG!=0 | data$CROPDMG!=0, select= c(EVTYPE,FATALITIES,INJURIES,PROPDMG,PROPDMGEXP,CROPDMG,CROPDMGEXP))
+
+length(unique(data1$EVTYPE))
+```
+
+```{r, echo=TRUE}
+data1$EVTYPE<-sub("FLOOD.*","Flood",data1$EVTYPE)
+data1$EVTYPE<-sub(".*TORNADO.*","Tornado",data1$EVTYPE)
+data1$EVTYPE<-sub("HEAT.*","Heat",data1$EVTYPE)
+data1$EVTYPE<-sub("HAIL.*","Hail",data1$EVTYPE)
+data1$EVTYPE<-sub(".*TSTM.*","Thunderstrom Wind",data1$EVTYPE)
+data1$EVTYPE<-sub(".*HURRICANE.*","hurricane",data1$EVTYPE)
+data1$EVTYPE<-toupper(data1$EVTYPE)
+length(unique(data1$EVTYPE))
+```
+
+###Answering Question 1: Events and Health
+
+To measure the impact of weather events on public health we look at:
+- the total number of Injuries ('INJURIES') or Deaths ('FATALITIES') caused by each respective event type ('EVTYPE').
+
+Data set is subset and aggregate to show accurate data set ('data2')
+
+```{r, echo=TRUE, cache=TRUE}
+
+data2<-aggregate(cbind(INJURIES,FATALITIES)~EVTYPE, data=data1, FUN=sum, na.rm=TRUE)
+
+head (data2)
+```
+
+Looking at the data, one can see that a significant amount of events have caused few or no injuries and/or deaths. 
+To answer the initial question we only select the top 7 events in terms of injuries and deaths caused respectively.
+
+```{r, echo=TRUE, cache=TRUE}
+
+data2.injuries<-data2[order(-data2$INJURIES),]
+data2.injuries<-data2.injuries[1:7,]
+
+data2.deaths<-data2[order(-data2$FATALITIES),]
+data2.deaths<-data2.deaths[1:7,]
+
+```
+
+The dataset is used to create the final plots answering the question. (see result in RESULTS section below)
+
+###Answering Question 2: Events and Material Damages (in $)
+
+To measure the impact of weather events on the economy we look at:
+- the total number of damages in $ ('PROPDMG' and 'CROPDMG') caused by each respective event type ('EVTYPE').
+
+The 'PROPDMGEXP' and 'CROPDMGEXP' columns are multipliers of the respective 'PROPDMG' and 'CROPDMG' column with:
+ - "K" for thousands, 
+ - "M" for millions, 
+ - "B" for billions
+
+Data set ('data1') is subset and aggregate to show accurate data set ('data3')
+
+```{r, echo=TRUE}
+multiplier<-function(X,Y){
+  if (Y=="K"|Y=="k"){X<-X*10^3}
+  if (Y=="M"|Y=="m"){X<-X*10^6}
+  if (Y=="B"|Y=="b"){X<-X*10^9}
+  if (Y=="H"|Y=="h"){X<-X*10^2}
+  return (X)
+
+  }
+data3<-subset(data1, data1$PROPDMG!=0 & data1$CROPDMG!=0, select= c(EVTYPE,PROPDMG,PROPDMGEXP,CROPDMG,CROPDMGEXP))
+data3$PROPDMG<-mapply(multiplier, data3$PROPDMG, data3$PROPDMGEXP)
+data3<-subset(data3, select=c(EVTYPE,PROPDMG,CROPDMG))
+data3<-aggregate(PROPDMG+CROPDMG~EVTYPE, data=data3, FUN=sum, na.rm=TRUE)
+colnames(data3)<-c("EVTYPE","DAMAGES")
+head(data3)
+```
+
+In order to answer the initial question we only select the top 7 events in terms of global damages (Property and Crop damages).
+
+```{r, echo=TRUE}
+data.damages<-data3[order(-data3$DAMAGES),]
+data.damages<-data.damages[1:7,]
+```
+
+## RESULTS
+
+###Plot 1: Top 7 events in terms of injuries
+
+```{r, echo=TRUE}
+library(ggplot2)
+qplot(EVTYPE, data=data2.injuries, weight=INJURIES, geom="histogram", main="Top 7 events in terms of Injuries in the USA (1995-2011)", xlab="Event Type", ylab = "Injuries cumulative count")
+```
+
+###Plot 2: Top 7 events in terms of deaths
+
+```{r, echo=TRUE}
+qplot(EVTYPE, data=data2.deaths, weight=FATALITIES, geom="histogram", main="Top 7 events in terms of deaths in the USA (1995-2011)", xlab="Event Type", ylab = "Deaths cumulative count" )
+```
+
+###Answer 1:
+As shown by those histograms we can see that Excessive Heats are the most harmful events for population health in terms of mortality and Tornados are most harmful events for population health in terms of injuries.
+
+For mortality: Tornados comes next, followed by Heats and Flash floods.
+For Injuries: Floods comes next, followed by Excessive Heat.
+
+###Plot 2: Top 7 events in terms of economy damages
+
+```{r, echo=TRUE}
+library(ggplot2)
+qplot(EVTYPE, data=data.damages, weight=DAMAGES, geom="histogram", main="Top 7 events in terms of economic damages in the USA (1995-2011)", xlab="Event Type", ylab = "Damages cumulative count")
+```
+
+###Answer 2:
+As shown by this last histogram we can see that floods are by fare the most harmful events for the US economy.The damages caused by flood have 3 times more impact on US economy than Hurricanes, second. Third comes flash floods (floods that last less than 2 days).
