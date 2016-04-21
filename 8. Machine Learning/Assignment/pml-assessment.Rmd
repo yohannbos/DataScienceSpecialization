@@ -1,0 +1,94 @@
+---
+output: html_document
+---
+
+#Quantified self movement
+
+##Summary
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to assess if they perform barbell lifts correctly and incorrectly (in 5 different ways).
+
+## Libraries and Data Processing
+
+```{r, results="hide", cache=FALSE}
+library(caret)
+library(corrplot)
+library(kernlab)
+library(randomForest)
+```
+Here we download the training and test set:
+
+```{r, cache=TRUE}
+#get data urls
+url1 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+url2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+#create directory if doesnot exist
+if (!file.exists("data")){dir.create("data")}
+
+#download data sets
+download.file(url1, destfile=file.path("data","pml_training.csv"))
+download.file(url2, destfile=file.path("data","pml_test.csv"))
+```
+
+#Cleaning Data
+
+When looking at the training dataset, one can see a lot of missing data (NAs) in some columns. To increase our model efficiency we remove specific columns. In addition we are removing unusefull columns for the model (like the "name" column):
+
+```{r, results="hide", cache=FALSE}
+#read the data
+train <- read.csv("./data/pml_training.csv", na.strings= c("NA",""," "))
+
+# cleaning the data 
+train_whithout_NAs <- apply(train, 2, function(x) {sum(is.na(x))})
+train_cleaned <- train[,which(train_whithout_NAs == 0)]
+
+# remove unusefull columns
+train_cleaned <- train_cleaned[8:length(train_cleaned)]
+```
+
+# Create a model
+
+We split the train set into a training set (70%) and a cross-validation set (30%):
+
+```{r, results="hide", cache=FALSE}
+inTrain <- createDataPartition(y = train_cleaned$classe, p = 0.7, list = FALSE)
+t <- train_cleaned[inTrain, ]
+cv <- train_cleaned[-inTrain, ]
+```
+
+As the problem is a classification problem, we can use a random forest model to fit the data:
+
+```{r, results="hide", cache=TRUE}
+model <- train(classe ~ ., data = t, method="rf")
+```
+#Cross Validation
+
+Now we test the accuracy of the model on the remaining 30% cross-validation set
+
+```{r, cache=TRUE}
+result1 <- predict(model, cv)
+confusionMatrix(cv$classe, result1)$overall['Accuracy']
+
+```
+The model reach a satisfactory accuracy rate
+
+##Prediction on test set
+
+Here we test the efficiency of our model. the data is first preprocessed like the training set:
+
+```{r, cache=FALSE}
+test <- read.csv("./data/pml_test.csv", na.strings= c("NA",""," "))
+test_without_NAs <- apply(test, 2, function(x) {sum(is.na(x))})
+test_cleaned <- test[,which(test_without_NAs == 0)]
+test_cleaned <- test_cleaned[8:length(test_cleaned)]
+
+# predict the classes of the test set
+result2 <- predict(model, test_cleaned)
+result2
+```
+##Conclusion
+
+Given the data quantity and quality, our model is able to yield a very satisfactory level of accuracy in predicting if the barbells lift are performed correctly or not.
