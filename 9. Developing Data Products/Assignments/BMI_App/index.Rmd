@@ -1,0 +1,76 @@
+---
+title       : BMI Application
+subtitle    : Compute your BMI
+author      : yohbos
+job         : DS
+framework   : io2012        # {io2012, html5slides, shower, dzslides, ...}
+highlighter : highlight.js  # {highlight.js, prettify, highlight}
+hitheme     : tomorrow      # 
+widgets     : []            # {mathjax, quiz, bootstrap}
+mode        : selfcontained # {standalone, draft}
+knit        : slidify::knit2slides
+---
+
+## Shiny Project
+
+The project must include the following:
+
+1. Some form of input (widget: textbox, radio button, checkbox, .)
+2. Some operation on the ui input in sever.R
+3. Some reactive output displayed as a result of server calculations
+4. Enough documentation so that a novice user could use your application.
+
+---
+
+## The BMI
+
+
+- What is BMI? 
+- Here is the formula <span class = 'red'>BMI = weight/(height*height)</span>
+- weight in kilograms
+- height in meters
+- The Goal of this app is to instantly compute the Body Mass Index of the app user.
+
+The app can be found on the following address:
+[BMI_App](http://yohbos.shinyapps.io/project/)
+
+---
+
+## How does the BMI App work?
+
+- The App is pretty simple to use:
+1. Enter your height
+2. Enter your weight
+3. your BMI will be calculated instantly and the shown on the plot
+
+- Depending on where your find yourself on the graph you can then detemine in which category you are in.
+
+---
+
+## Have a look at the Application
+
+```{r simple-plot, fig.height = 6, fig.align = 'center', message = F, echo =FALSE}
+#How the plot is created
+
+bmi<- function (wt, ht){wt/(ht*ht*(10^-3))}
+
+library(ggplot2)
+library(RColorBrewer)
+
+wt <- seq(50,170, 0.7)
+ht <- seq(100,220, 0.7)
+df <- expand.grid(x = as.numeric(wt), y = as.numeric(ht))
+    df$z <- as.factor(with(df, ifelse(bmi(x,y)<=1.8, "underweighted",
+                                      ifelse(bmi(x,y)<=2.5,"normal",
+                                             ifelse(bmi(x,y)<=3.0, "overweigthed","obese")))))
+    colnames(df) <- c("weight", 'height', "bmi")
+    g<-ggplot(df, aes(y=weight,x=height, colour =bmi))
+    g + geom_point() +scale_color_brewer(palette="YlOrRd")
+```
+
+--- 
+
+
+
+
+
